@@ -10,7 +10,7 @@
     :marks [{:type :long :start 0 :end 2}
             {:type :long :start 3 :end 4}
             {:type :long :start 5 :end 7}
-            {:type :long :start 9 :end 12}
+            {:type :long :start 9 :end 11}
             {:type :short :start 31 :end 32}
             {:type :short :start 33 :end 34}
             ]}))
@@ -61,7 +61,10 @@
            (fn [idx {:keys [type start end] :as mark}]
              (let [prefix-start (subs text 0 start)
                    prefix-end (subs text 0 end)
-                   {:keys [x1 x2]} (get @mark-positions idx {:x1 0 :x2 0})]
+                   {:keys [x1 x2]} (get @mark-positions idx {:x1 0 :x2 0})
+                   manual-offset 5
+                   x1 (+ x1 manual-offset)
+                   x2 (+ x2 manual-offset)]
                [:<> {:key (str "mark-group-" idx)}
                 ;; Hidden text for measuring start and end
                 [:text {:id (str "measure-start-" idx) :visibility "hidden"
