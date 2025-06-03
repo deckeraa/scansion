@@ -109,7 +109,7 @@
                     (let [selected-text (str sel)
                           start (.indexOf text selected-text)]
                       (when (and (>= start 0) (not= start -1))
-                        (let [end (+ start (.-length selected-text))]
+                        (let [end (dec (+ start (.-length selected-text)))]
                           (when (<= end (count text))
                             (reset! selection-range {:start start :end end}))))))))))
           add-mark
