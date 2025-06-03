@@ -1,29 +1,57 @@
 (ns app.verse
   (:require [reagent.core :as r]
             [reagent.dom :as rdom]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [clojure.walk :as walk]))
+
+;; Utility functions for localStorage
+(defn save-to-local-storage
+  "Saves a Clojure data structure to localStorage under the given key."
+  [key data]
+  (.setItem js/localStorage key (js/JSON.stringify (clj->js data))))
+
+(defn load-from-local-storage
+  "Loads and deserializes a Clojure data structure from localStorage, converting :type values to keywords."
+  [key]
+  (when-let [item (.getItem js/localStorage key)]
+    (let [parsed (js->clj (js/JSON.parse item) :keywordize-keys true)]
+      (walk/postwalk
+       (fn [x]
+         (if (and (map? x) (contains? x :type) (string? (:type x)))
+           (update x :type keyword)
+           x))
+       parsed))))
 
 ;; State atom for the verse data
 (def verse-state
   (r/atom
-   {:text "Salvātor mundī, postquam dē Virgine nāscī"
-    :marks [{:type :long :start 0 :end 2}
-            {:type :long :start 3 :end 4}
-            {:type :long :start 5 :end 7}
-            {:type :long :start 9 :end 11}
-            {:type :vertical :start 11, :end 12}
-            {:type :short :start 31 :end 32}
-            {:type :short :start 33 :end 34}
-            ]}))
+   (or (load-from-local-storage "verse-state")
+       {:text "Salvātor mundī, postquam dē Virgine nāscī"
+        :marks [{:type :long :start 0 :end 2}
+                {:type :long :start 3 :end 4}
+                {:type :long :start 5 :end 7}
+                {:type :long :start 9 :end 11}
+                {:type :vertical :start 11, :end 12}
+                {:type :short :start 31 :end 32}
+                {:type :short :start 33 :end 34}
+                ]})))
+
+;; (r/run!
+;;  (save-to-local-storage "verse-state" @verse-state)
+;;  verse-state)
+
+(add-watch verse-state :save-to-local-storage
+           (fn [_ _ _ new-state]
+             (save-to-local-storage "verse-state" new-state)))
 
 ;; line->svg component with precise measurements
 (defn line->svg [{:keys [text marks]}]
   (r/with-let [font-size 16
-               y-text 20     ; Y-position of text
-               y-mark 30     ; Y-position for marks baseline
-               arc-height 8  ; Height of short mark arc
-               vertical-height 10           ; Height above/below text for vertical lines
-               double-line-gap 2            ; Gap between lines in double-vertical
+               y-text 20               ; Y-position of text
+               y-mark 30               ; Y-position for marks baseline
+               arc-height 8            ; Height of short mark arc
+               vertical-height 10 ; Height above/below text for vertical lines
+               double-line-gap 2 ; Gap between lines in double-vertical
                height (+ y-mark arc-height vertical-height 5) ; Increased height for vertical lines
                y-vertical-top (- y-text vertical-height) ; Top of vertical lines
                y-vertical-bottom (+ y-mark vertical-height)
