@@ -10,6 +10,7 @@
     :marks [{:type :long :start 0 :end 2}
             {:type :long :start 3 :end 4}
             {:type :long :start 5 :end 7}
+            {:type :long :start 9 :end 12}
             {:type :short :start 31 :end 32}]}))
 
 ;; line->svg component with precise measurements
@@ -83,38 +84,47 @@
 
 ;; Component to handle mark addition
 (defn mark-adder []
-  (let [mark-type (r/atom :long) ; Default mark type
-        selection-range (r/atom nil)]
-    (fn []
-      (let [update-selection
-            (fn []
-              (let [sel (js/window.getSelection)
-                    range (when (.-rangeCount sel) (.getRangeAt sel 0))
-                    text-node (.getElementById js/document "verse-text")
-                    text (:text @verse-state)]
-                (when (and range (.containsNode range text-node))
-                  (let [selected-text (.-toString sel)
-                        start (.indexOf text selected-text)]
-                    (when (and (>= start 0) (not= start -1))
-                      (let [end (+ start (.-length selected-text))]
-                        (when (<= end (count text))
-                          (reset! selection-range {:start start :end end}))))))))
-            add-mark
-            (fn []
-              (when @selection-range
-                (swap! verse-state update :marks conj
-                       (assoc @selection-range :type @mark-type))
-                (reset! selection-range nil)
-                (.removeAllRanges (js/window.getSelection))))]
-        [:div
-         [:h3 "Add Mark"]
-         [:select {:value @mark-type
-                   :on-change #(reset! mark-type (keyword (-> % .-target .-value)))}
-          [:option {:value "long"} "Long"]
-          [:option {:value "short"} "Short"]]
-         [:button {:on-click #(do (update-selection) (add-mark))} "Add Mark"]
-         (when @selection-range
-           [:p "Selected: " (str @selection-range)])]))))
+  (r/with-let
+    [mark-type (r/atom :long)         ; Default mark type
+     selection-range (r/atom nil)]     ; Selection state
+    (let [update-selection
+          (fn []
+            (let [sel (js/window.getSelection)
+                  range (when (.-rangeCount sel) (.getRangeAt sel 0))
+                  text-node (.getElementById js/document "verse-text")
+                  text (:text @verse-state)]
+              (when (and range text-node)
+                ;; Check if the selection is within the verse-text element
+                (let [start-container (.-startContainer range)
+                      end-container (.-endContainer range)
+                      is-within-text-node
+                      (or (identical? start-container text-node)
+                          (.contains text-node start-container)
+                          (identical? end-container text-node)
+                          (.contains text-node end-container))]
+                  (when is-within-text-node
+                    (let [selected-text (str sel)
+                          start (.indexOf text selected-text)]
+                      (when (and (>= start 0) (not= start -1))
+                        (let [end (+ start (.-length selected-text))]
+                          (when (<= end (count text))
+                            (reset! selection-range {:start start :end end}))))))))))
+          add-mark
+          (fn []
+            (when @selection-range
+              (swap! verse-state update :marks conj
+                     (assoc @selection-range :type @mark-type))
+              (reset! selection-range nil)
+              (.removeAllRanges (js/window.getSelection))))]
+      [:div
+       [:h3 "Add Mark"]
+       [:select {:value @mark-type
+                 :on-change #(reset! mark-type (keyword (-> % .-target .-value)))}
+        [:option {:value "long"} "Long"]
+        [:option {:value "short"} "Short"]]
+       [:button {:on-click #(do (update-selection) (add-mark))} "Add Mark"]
+       (when @selection-range
+         [:p "Selected: " (str @selection-range)])])))
 
 ;; Main verse component
 (defn verse []
