@@ -11,6 +11,7 @@
             {:type :long :start 3 :end 4}
             {:type :long :start 5 :end 7}
             {:type :long :start 9 :end 11}
+            {:type :vertical :start 11, :end 12}
             {:type :short :start 31 :end 32}
             {:type :short :start 33 :end 34}
             ]}))
@@ -21,7 +22,11 @@
                y-text 20     ; Y-position of text
                y-mark 30     ; Y-position for marks baseline
                arc-height 8  ; Height of short mark arc
-               height 50     ; SVG height
+               vertical-height 10           ; Height above/below text for vertical lines
+               double-line-gap 2            ; Gap between lines in double-vertical
+               height (+ y-mark arc-height vertical-height 5) ; Increased height for vertical lines
+               y-vertical-top (- y-text vertical-height) ; Top of vertical lines
+               y-vertical-bottom (+ y-mark vertical-height)
                ;; State for dynamically measured mark positions
                mark-positions (r/atom {})
                ;; Ref to track if measurements have been taken for the current marks
@@ -85,6 +90,20 @@
                     [:path {:key (str "mark-" idx)
                             :d (str "M" x1 "," y-mark " Q" mid-x "," control-y " " x2 "," y-mark)
                             :fill "none" :stroke "black" :stroke-width 1}])
+                  (= type :vertical)
+                  (let [mid-x (/ (+ x1 x2) 2)]
+                    [:line {:key (str "mark-" idx)
+                            :x1 mid-x :y1 y-vertical-top :x2 mid-x :y2 y-vertical-bottom
+                            :stroke "black" :stroke-width 1}])
+                  (= type :double-vertical)
+                  (let [mid-x (/ (+ x1 x2) 2)]
+                    [:<>
+                     [:line {:key (str "mark-left-" idx)
+                             :x1 mid-x :y1 y-vertical-top :x2 mid-x :y2 y-vertical-bottom
+                             :stroke "black" :stroke-width 1}]
+                     [:line {:key (str "mark-right-" idx)
+                             :x1 (+ mid-x double-line-gap) :y1 y-vertical-top :x2 (+ mid-x double-line-gap) :y2 y-vertical-bottom
+                             :stroke "black" :stroke-width 1}]])
                   :else nil)]))
            marks))]]])))
 
@@ -127,7 +146,9 @@
        [:select {:value @mark-type
                  :on-change #(reset! mark-type (keyword (-> % .-target .-value)))}
         [:option {:value "long"} "Long"]
-        [:option {:value "short"} "Short"]]
+        [:option {:value "short"} "Short"]
+        [:option {:value "vertical"} "Vertical"]
+        [:option {:value "double-vertical"} "Double Vertical"]]
        [:button {:on-click #(do (update-selection) (add-mark))} "Add Mark"]
        (when @selection-range
          [:p "Selected: " (str @selection-range)])])))
