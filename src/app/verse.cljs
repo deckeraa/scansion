@@ -36,13 +36,22 @@
                 {:type :short :start 33 :end 34}
                 ]})))
 
-;; (r/run!
-;;  (save-to-local-storage "verse-state" @verse-state)
-;;  verse-state)
-
 (add-watch verse-state :save-to-local-storage
            (fn [_ _ _ new-state]
              (save-to-local-storage "verse-state" new-state)))
+
+;; Utility function to download verse-state as a .clj file
+(defn download-verse-state []
+  (let [state-str (pr-str @verse-state) ; Convert verse-state to Clojure string
+        blob (js/Blob. #js [state-str] #js {:type "text/plain"})
+        url (js/URL.createObjectURL blob)
+        link (.createElement js/document "a")]
+    (.setAttribute link "href" url)
+    (.setAttribute link "download" "verse-state.clj")
+    (.appendChild (.-body js/document) link)
+    (.click link)
+    (.removeChild (.-body js/document) link)
+    (js/URL.revokeObjectURL url)))
 
 ;; line->svg component with precise measurements
 (defn line->svg [{:keys [text marks]}]
@@ -187,4 +196,5 @@
    [:h1 "Text with Versification Marks"]
    [line->svg @verse-state]
    [mark-adder]
+   [:button {:on-click download-verse-state} "Download as .clj"]
    [:p (str @verse-state)]])
