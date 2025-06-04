@@ -2,7 +2,8 @@
   (:require [reagent.core :as r]
             [reagent.dom :as rdom]
             [clojure.string :as str]
-            [clojure.walk :as walk]))
+            [clojure.walk :as walk]
+            [cljs.reader :as reader]))
 
 ;; Utility functions for localStorage
 (defn save-to-local-storage
@@ -52,6 +53,45 @@
     (.click link)
     (.removeChild (.-body js/document) link)
     (js/URL.revokeObjectURL url)))
+
+(defn validate-verse-state [data]
+  (if (and (map? data)
+           (string? (:text data))
+           (vector? (:marks data))
+           (every? (fn [mark]
+                     (and (map? mark)
+                          (integer? (:start mark))
+                          (or (#{:vertical :double-vertical} (:type mark))
+                              (integer? (:end mark)))
+                          (#{:long :short :vertical :double-vertical} (:type mark))))
+                   (:marks data)))
+    (walk/postwalk
+     (fn [x]
+       (if (and (map? x) (contains? x :type) (string? (:type x)))
+         (update x :type keyword)
+         x))
+     data)
+    (do
+      (js/alert "Invalid .clj file: Must contain :text (string) and :marks (vector of valid marks).")
+      nil)))
+
+;; Utility function to handle file upload
+(defn upload-verse-state [event]
+  (let [file (aget (.-files (.-target event)) 0)]
+    (when file
+      (let [reader (js/FileReader.)]
+        (set! (.-onload reader)
+              (fn [e]
+                (try
+                  (let [content (.-result (.-target e))
+                        parsed (reader/read-string content)
+                        validated (validate-verse-state parsed)]
+                    (when validated
+                      (reset! verse-state validated)
+                      (save-to-local-storage "verse-state" validated)))
+                  (catch js/Error e
+                    (js/alert (str "Error parsing .clj file: " (.-message e)))))))
+        (.readAsText reader file)))))
 
 ;; line->svg component with precise measurements
 (defn line->svg [{:keys [text marks]}]
@@ -192,9 +232,21 @@
 
 ;; Main verse component
 (defn verse []
-  [:<>
-   [:h1 "Text with Versification Marks"]
-   [line->svg @verse-state]
-   [mark-adder]
-   [:button {:on-click download-verse-state} "Download as .clj"]
-   [:p (str @verse-state)]])
+  (r/with-let [file-input-ref (r/atom nil)
+               _ (when-not (load-from-local-storage "verse-state")
+                   (save-to-local-storage "verse-state" @verse-state))]
+    [:<>
+     [:h1 "Text with Versification Marks"]
+     [line->svg @verse-state]
+     [mark-adder]
+     [:button {:on-click download-verse-state} "Download as .clj"]
+     [:label {:style {:cursor "pointer"}}
+      [:input {:type "file"
+               :accept ".clj"
+               :style {:display "none"}
+               :ref #(when % (reset! file-input-ref %))
+               :on-change upload-verse-state}]
+      [:button {:style {}
+                :on-click #(.click @file-input-ref)}
+       "Upload .clj"]]
+     [:p (str @verse-state)]]))
