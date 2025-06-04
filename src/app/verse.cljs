@@ -61,9 +61,9 @@
            (every? (fn [mark]
                      (and (map? mark)
                           (integer? (:start mark))
-                          (or (#{:vertical :double-vertical} (:type mark))
+                          (or (#{:vertical :double-vertical :elision} (:type mark))
                               (integer? (:end mark)))
-                          (#{:long :short :vertical :double-vertical} (:type mark))))
+                          (#{:long :short :vertical :double-vertical :elision} (:type mark))))
                    (:marks data)))
     (walk/postwalk
      (fn [x]
@@ -101,6 +101,8 @@
                arc-height 8            ; Height of short mark arc
                vertical-height 10 ; Height above/below text for vertical lines
                double-line-gap 2 ; Gap between lines in double-vertical
+               elision-offset 0           ; Y-offset below baseline for elision mark
+               elision-size 10             ; Font size for elision "x"
                height (+ y-mark arc-height vertical-height 5) ; Increased height for vertical lines
                y-vertical-top (- y-text vertical-height) ; Top of vertical lines
                y-vertical-bottom (+ y-mark vertical-height)
@@ -181,6 +183,12 @@
                      [:line {:key (str "mark-right-" idx)
                              :x1 (+ mid-x double-line-gap) :y1 y-vertical-top :x2 (+ mid-x double-line-gap) :y2 y-vertical-bottom
                              :stroke "black" :stroke-width 1}]])
+                  (= type :elision)
+                  [:text {:key (str "mark-" idx)
+                          :x x1 :y (+ y-mark elision-offset)
+                          :font-family "monospace" :font-size elision-size
+                          :text-anchor "middle"}
+                   "x"]
                   :else nil)]))
            marks))]]])))
 
@@ -225,7 +233,8 @@
         [:option {:value "long"} "Long"]
         [:option {:value "short"} "Short"]
         [:option {:value "vertical"} "Vertical"]
-        [:option {:value "double-vertical"} "Double Vertical"]]
+        [:option {:value "double-vertical"} "Double Vertical"]
+        [:option {:value "elision"} "Elision"]]
        [:button {:on-click #(do (update-selection) (add-mark))} "Add Mark"]
        (when @selection-range
          [:p "Selected: " (str @selection-range)])])))
